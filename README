@@ -1,0 +1,25 @@
+README:
+
+Assignment 5: Lighting
+Alexander Curtiss
+CSCI 4229
+
+Key bindings:
+=============
+
+   arrow keys Change view angle - also change camera position in overview mode
+   m          Toggle perspective
+   spacebar   Stop light motion
+   </>        Move light angle
+   [/]        Lower/rise light
+   a/A        Decrease/increase ambient light
+   d/D        Decrease/increase diffuse light
+   s/S        Decrease/increase specular light
+   e/E        Decrease/increase emitted light
+   n/N        Decrease/increase shininess
+   0          Reset view angle
+   ESC        Exit
+
+Time taken:
+===========
+Roughly 4 hours
