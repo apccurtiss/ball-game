@@ -25,9 +25,13 @@ int diffuse   = 100;  // Diffuse intensity (%)
 int specular  =   0;  // Specular intensity (%)
 int zh        =  90;  // Light azimuth
 float ylight  =   .6;  // Elevation of light
-float terrain[3][3] = {{0,0,0},{1,0,0},{1,0,1}};
+float terrain[][5] = {{1,4,2,2,1},{0,0,0,0,.5},{1,0,0,0,.5},{1,0,1,0,.5},{1,1,1,0,.5},{2,4,4,0,.5},{1,2,3,0,.5},{0,4,0,0,.5},{3,7,1,0,.5}};
+int terrainsize = sizeof(terrain) / sizeof(*terrain);
 float charsize = 0.2;
-float charpos[]={0,0.7,0,0.2};
+float charpos[]={0,1.7,0,0.2};
+float acc    = 0;
+float tick  = 0;
+
 
 #define Cos(th) cos(3.1415927/180*(th))
 #define Sin(th) sin(3.1415927/180*(th))
@@ -122,15 +126,11 @@ static void player(double x,double y,double z,double r)
 
 void display()
 {
-   //  Erase the window and the depth buffer
    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
-   //  Enable Z-buffering in OpenGL
    glEnable(GL_DEPTH_TEST);
-   //  Undo previous transformations
    glLoadIdentity();
    
    gluLookAt(charpos[0] - Cos(th) * 2,charpos[1] + ylight * 1.5,charpos[2] - Sin(th) * 2, charpos[0],charpos[1],charpos[2], 0,Cos(ph),0);
-   
    
    glShadeModel(GL_SMOOTH);
 
@@ -152,8 +152,13 @@ void display()
    
    player(charpos[0], charpos[1], charpos[2], charsize);
    int k;
-   for(k=0; k < 3; k++) {
-       blok(terrain[k]);
+   for(k=0; k < terrainsize; k++) {
+       if(terrain[k][3] == 0) {
+           blok(terrain[k]);
+       } else if(terrain[k][3] == 2) {
+           hoop(terrain[k]);
+       }
+       
    }
    glDisable(GL_LIGHT0);
    //  Display parameters
@@ -178,11 +183,38 @@ void display()
  */
 void idle()
 {
+
    int k;
-   for(k=0; k < 3; k++) {
-       
-   }
    double t = glutGet(GLUT_ELAPSED_TIME)/1000.0;
+   if(t > tick + 0.01) {
+       tick = t;
+       for(k=0; k < terrainsize; k++) {
+           if(terrain[k][3] < 2
+           &&fabs(charpos[0] - terrain[k][0]) <= terrain[k][4]
+           && charpos[1] < terrain[k][1] + 0.7
+           && charpos[1] > terrain[k][1] + 0.6
+           && fabs(charpos[2] - terrain[k][2]) <= terrain[k][4])
+           {
+               acc = -acc;
+               terrain[k][4] = terrain[k][4] * 0.9;
+               charpos[1] += 0.5;
+               
+               break;
+           }
+           else 
+           {
+               //printf("%f %f\n", acc, t);
+               if (acc < 0.5) {
+                   acc = acc - 0.00001;
+               }
+               
+           }
+           
+           charpos[1] += acc;
+       }
+   }
+   
+   
    zh = fmod(90*t,360.0);
    //  Tell GLUT it is necessary to redisplay the scene
    glutPostRedisplay();
@@ -239,25 +271,11 @@ void key(unsigned char ch,int x,int y)
    else if (ch==']')
       ylight += 0.1;
    //  Ambient level
-   else if (ch=='a' && ambient>0)
-      ambient -= 5;
-   else if (ch=='A' && ambient<100)
-      ambient += 5;
-   //  Diffuse level
-   else if (ch=='d' && diffuse>0)
-      diffuse -= 5;
-   else if (ch=='D' && diffuse<100)
-      diffuse += 5;
-   //  Specular level
-   else if (ch=='s' && specular>0)
-      specular -= 5;
-   else if (ch=='S' && specular<100)
-      specular += 5;
-   //  Emission level
-   else if (ch=='e' && emission>0)
-      emission -= 5;
-   else if (ch=='E' && emission<100)
-      emission += 5;
+   else if (ch==' ') {
+      charpos[0] = 0;
+      charpos[1] = 1.7;
+      charpos[2] = 0;
+   }
    //  Change field of view angle
    else if (ch == '-' && ch>1)
       fov--;
