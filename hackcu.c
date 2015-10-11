@@ -17,6 +17,7 @@ double asp=1;     //  Aspect ratio
 double dim=3.0;   //  Size of world
 
 // Light values
+int up = 0, down = 0, left = 0, right = 0;
 int one       =   1;  // Unit value
 int inc       =  10;  // Ball increment
 int emission  =   0;  // Emission intensity (%)
@@ -88,7 +89,7 @@ static void Vertex(double th,double ph)
    double z =         Sin(ph);
    //  For a sphere at the origin, the position
    //  and normal vectors are the same
-   glNormal3d(x,y,z);
+   glNormal3d(-x,-y,-z);
    glVertex3d(x,y,z);
 }
 
@@ -100,6 +101,7 @@ static void Vertex(double th,double ph)
 static void player(double x,double y,double z,double r)
 {
    int th,ph;
+
    //  Save transformation
    glPushMatrix();
    //  Offset, scale and rotate
@@ -122,8 +124,6 @@ static void player(double x,double y,double z,double r)
    glPopMatrix();
 }
 
-
-
 void display()
 {
    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
@@ -138,6 +138,7 @@ void display()
    float Ambient[]   = {0.01*ambient ,0.01*ambient ,0.01*ambient ,1.0};
    float Diffuse[]   = {0.01*diffuse ,0.01*diffuse ,0.01*diffuse ,1.0};
    float Specular[]  = {0.01*specular,0.01*specular,0.01*specular,1.0};
+   float Position[]  = {charpos[0],charpos[1],charpos[2],1.0};
    glColor3f(1,1,1);
    glEnable(GL_LIGHT0);
    
@@ -149,6 +150,7 @@ void display()
    glLightfv(GL_LIGHT0,GL_AMBIENT ,Ambient);
    glLightfv(GL_LIGHT0,GL_DIFFUSE ,Diffuse);
    glLightfv(GL_LIGHT0,GL_SPECULAR,Specular);
+   glLightfv(GL_LIGHT0,GL_POSITION,Position);
    
    player(charpos[0], charpos[1], charpos[2], charsize);
    int k;
@@ -183,35 +185,43 @@ void display()
  */
 void idle()
 {
-
-   int k;
-   double t = glutGet(GLUT_ELAPSED_TIME)/1000.0;
-   if(t > tick + 0.01) {
-       tick = t;
-       for(k=0; k < terrainsize; k++) {
-           if(terrain[k][3] < 2
-           &&fabs(charpos[0] - terrain[k][0]) <= terrain[k][4]
-           && charpos[1] < terrain[k][1] + 0.7
-           && charpos[1] > terrain[k][1] + 0.6
-           && fabs(charpos[2] - terrain[k][2]) <= terrain[k][4])
-           {
-               acc = -acc;
-               terrain[k][4] = terrain[k][4] * 0.9;
-               charpos[1] += 0.5;
+    int k;
+    double t = glutGet(GLUT_ELAPSED_TIME)/1000.0;
+    if(t > tick + 0.01) {
+        tick = t;
+       
+        float step = 0.02;
+   
+        if (right) {
+           th += 1;
+        } else if (left) {
+           th -= 1;
+        } else if (up) {
+           charpos[0] += Cos(th)*step;
+           charpos[2] += Sin(th)*step;
+        } else if (down) {
+           charpos[0] -= Cos(th)*step;
+           charpos[2] -= Sin(th)*step;
+        }
+      
+        for(k=0; k < terrainsize; k++) {
+            if(
+            terrain[k][3] < 2
+            && fabs(charpos[0] - terrain[k][0]) <= terrain[k][4]
+            && fabs(charpos[2] - terrain[k][2]) <= terrain[k][4]
+            && charpos[1] - charsize > terrain[k][1] + terrain[k][4]
+            && charpos[1] - charsize + acc < terrain[k][1] + terrain[k][4])
+            {
+                acc = -acc;
+                acc = acc + 0.001;
+                terrain[k][4] = terrain[k][4] * 0.9;
+                charpos[1] = charsize + terrain[k][1] + terrain[k][4] + 0.01;
                
-               break;
-           }
-           else 
-           {
-               //printf("%f %f\n", acc, t);
-               if (acc < 0.5) {
-                   acc = acc - 0.00001;
-               }
-               
-           }
-           
-           charpos[1] += acc;
-       }
+                break;
+            }
+        }
+        acc -= 0.001;
+        charpos[1] += acc;
    }
    
    
@@ -224,27 +234,36 @@ void idle()
  *  GLUT calls this routine when an arrow key is pressed
  */
 void special(int key,int x,int y)
-{
-   int direction=Cos(ph)>0?1:-1;
-   float step = 0.1;
-   
+{   
    if (key == GLUT_KEY_RIGHT) {
-      th += 5;
+      right = 1;
    } else if (key == GLUT_KEY_LEFT) {
-      th -= 5;
+      left = 1;
    } else if (key == GLUT_KEY_UP) {
-      charpos[0] += Cos(th)*step*direction;
-      charpos[2] += Sin(th)*step*direction;
+      up = 1;
    } else if (key == GLUT_KEY_DOWN) {
-      charpos[0] -= Cos(th)*step*direction;
-      charpos[2] -= Sin(th)*step*direction;
-   } else if (key == GLUT_KEY_PAGE_DOWN) {
-      dim += 0.1;
-   } else if (key == GLUT_KEY_PAGE_UP && dim>1) {
-      dim -= 0.1;
-   } else if (key == 32)
-      move = 1 - move;
+      down = 1;
+   }
   
+   th %= 360;
+   ph %= 360;
+   Project(mode?fov:0,asp,dim);
+   //  Tell GLUT it is necessary to redisplay the scene
+   glutPostRedisplay();
+}
+
+void specialup(int key,int x,int y)
+{
+   if (key == GLUT_KEY_RIGHT) {
+      right = 0;
+   } else if (key == GLUT_KEY_LEFT) {
+      left = 0;
+   } else if (key == GLUT_KEY_UP) {
+      up = 0;
+   } else if (key == GLUT_KEY_DOWN) {
+      down = 0;
+   }
+   
    th %= 360;
    ph %= 360;
    Project(mode?fov:0,asp,dim);
@@ -325,7 +344,9 @@ int main(int argc,char* argv[])
    glutDisplayFunc(display);
    glutReshapeFunc(reshape);
    glutSpecialFunc(special);
+   glutSpecialUpFunc(specialup);
    glutKeyboardFunc(key);
+   
    glutIdleFunc(idle);
    //  Pass control to GLUT so it can interact with the user
    ErrCheck("init");
