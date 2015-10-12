@@ -27,38 +27,35 @@ int diffuse   = 100;  // Diffuse intensity (%)
 int specular  =   0;  // Specular intensity (%)
 int zh        =  90;  // Light azimuth
 float viewy  =   .6;  // Elevation of light
-float terrain[][5] = {{1,4,2,2,1},{0,0,0,0,.5},{2,0,0,0,.5},{2,0,2,0,.5},{2,1,2,0,.5},{2,4,4,0,.5},{1,2,3,0,.5},{0,4,0,0,.5},{3,7,1,0,.5}};
 unsigned int testtex;
-int terrainsize = sizeof(terrain) / sizeof(*terrain);
 float charsize = 0.2;
 float charpos[]={0,2,0,0.2};
 float acc    = 0;
 float tick  = 0;
 
+typedef struct
+{
+   char type;
+   float pos[4]; // x, y, z, radius
+   float prop[3];
+} block;
 
-void ReadTerrainFile() {
-    FILE *ifp, *ofp;
-char *mode = "r";
-char outputFilename[] = "out.list";
-
-ifp = fopen("in.list", mode);
-
-if (ifp == NULL) {
-  fprintf(stderr, "Can't open input file in.list!\n");
-  exit(1);
-}
-
-ofp = fopen(outputFilename, "w");
-
-if (ofp == NULL) {
-  fprintf(stderr, "Can't open output file %s!\n",
-          outputFilename);
-  exit(1);
-}
-}
+block terrain[] = {
+//  Type, Dimensions, Properties
+   {'b', {-1,0,0,0.5}, {1,0,0}},
+   {'b', {0,0,0,0.5}, {1,0,0}},
+   {'b', {1,0,0,0.5}, {1,0,0}},
+   {'b', {1,0,1,0.5}, {1,0,0}},
+   {'b', {1,0,-1,0.5}, {1,0,0}},
+   {'b', {2,0,0,0.5}, {1,0,0}},
+   {'b', {2,1,1,0.5}, {1,0,0}},
+   {'b', {3,0,3,1}, {1,0,0}}
+};
+int terrainsize = sizeof(terrain) / sizeof(*terrain);
 
 void Print(const char* format , ...)
 {
+   
    char    buf[8192];
    char*   ch=buf;
    va_list args;
@@ -112,7 +109,6 @@ void display()
    float Position[]  = {charpos[0],charpos[1],charpos[2],1.0};
    glColor3f(1,1,1);
    glEnable(GL_LIGHT0);
-   
    glEnable(GL_NORMALIZE);
    glEnable(GL_LIGHTING);
    //glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER,0);
@@ -127,24 +123,27 @@ void display()
    
    int k;
    for(k=0; k < terrainsize; k++) {
-       if(terrain[k][3] == 0) {
-           blok(terrain[k]);
-       } else if(terrain[k][3] == 2) {
-           hoop(terrain[k]);
+       if(terrain[k].type == 'b' && terrain[k].prop[0] < 4) {
+           blok(terrain[k].pos, terrain[k].prop);
+       } else if(terrain[k].type == 'h') {
+           hoop(terrain[k].pos, terrain[k].prop);
        }
        
    }
    player(charpos[0], charpos[1], charpos[2], charsize, testtex);
+   glDisable(GL_LIGHTING);
+   glDisable(GL_NORMALIZE);
    glDisable(GL_LIGHT0);
    //  Display parameters
    
    if (charpos[1] < -5)
    {  
       glColor3f(1 , 1 , 1);
-      glWindowPos2i((w/2)-100, h/2);
-      Print("Press spacebar to restart!");
       glWindowPos2i((w/2)-50, (h/2)+20);
       Print("Game over!");
+      glWindowPos2i((w/2)-100, h/2);
+      Print("Press spacebar to restart");
+      
    }
 
    //  Render the scene and make it visible
@@ -153,60 +152,58 @@ void display()
    glutSwapBuffers();
 }
 
-/*
- *  GLUT calls this routine when the window is resized
- *  Taken verbatum from ex13.
- */
 void idle()
 {
-    double t = glutGet(GLUT_ELAPSED_TIME)/1000.0;
-    if(t > tick + 0.01) {
-        tick = t;
+   double t = glutGet(GLUT_ELAPSED_TIME)/1000.0;
+   if(t > tick + 0.01) {
+      tick = t;
        
-        float step = 0.02;
-   
-        if (right) {
-           th += 1;
-        } else if (left) {
-           th -= 1;
-        } else if (up) {
-           charpos[0] += Cos(th)*step;
-           charpos[2] += Sin(th)*step;
-        } else if (down) {
-           charpos[0] -= Cos(th)*step;
-           charpos[2] -= Sin(th)*step;
-        }
+      float step = 0.025;
+        
+      int k;
+      if (right) {
+         th += 1;
+      } else if (left) {
+         th -= 1;
+      } else if (up) {
+         charpos[0] += Cos(th)*step;
+         charpos[2] += Sin(th)*step;
+      } else if (down) {
+         charpos[0] -= Cos(th)*step;
+         charpos[2] -= Sin(th)*step;
+      }
       
-        int k;
-        for(k=0; k < terrainsize; k++) {
-            if(
-            terrain[k][3] < 2
-            && fabs(charpos[0] - terrain[k][0]) <= terrain[k][4]
-            && fabs(charpos[2] - terrain[k][2]) <= terrain[k][4]
-            && charpos[1] - charsize >= terrain[k][1] + terrain[k][4]
-            && charpos[1] - charsize + acc <= terrain[k][1] + terrain[k][4])
+      for(k=0; k < terrainsize; k++) {
+         if (terrain[k].type == 'b') {
+            float bdim=terrain[k].pos[3] / terrain[k].prop[0];
+            if (
+            terrain[k].prop[0] < 4
+            && fabs(charpos[0] - terrain[k].pos[0]) <= bdim + charsize
+            && fabs(charpos[2] - terrain[k].pos[2]) <= bdim + charsize
+            && charpos[1] - charsize >= terrain[k].pos[1] + bdim
+            && charpos[1] - charsize + acc <= terrain[k].pos[1] + bdim
+            )
             {
                 acc = -acc;
                 acc = acc + 0.001;
-                charpos[1] = charsize + terrain[k][1] + terrain[k][4] + 0.01;
-                terrain[k][4] = terrain[k][4] * 0.9;
-               
+            
+                //terrain[k][1] = terrain[k][1] - 0.2;
+                terrain[k].prop[0] = terrain[k].prop[0] * 1.5;
+                charpos[1] = terrain[k].pos[1] + bdim + charsize + 0.01;
                 break;
             }
-        }
-        acc -= 0.001;
-        charpos[1] += acc;
+         }
+      }
+      
+      acc -= 0.001;
+      charpos[1] += acc;
    }
-   
    
    zh = fmod(90*t,360.0);
    //  Tell GLUT it is necessary to redisplay the scene
    glutPostRedisplay();
 }
 
-/*
- *  GLUT calls this routine when an arrow key is pressed
- */
 void special(int key,int x,int y)
 {   
    if (key == GLUT_KEY_RIGHT) {
@@ -218,12 +215,6 @@ void special(int key,int x,int y)
    } else if (key == GLUT_KEY_DOWN) {
       down = 1;
    }
-  
-   th %= 360;
-   ph %= 360;
-   Project(mode?fov:0,asp,dim);
-   //  Tell GLUT it is necessary to redisplay the scene
-   glutPostRedisplay();
 }
 
 void specialup(int key,int x,int y)
@@ -237,33 +228,13 @@ void specialup(int key,int x,int y)
    } else if (key == GLUT_KEY_DOWN) {
       down = 0;
    }
-   
-   th %= 360;
-   ph %= 360;
-   Project(mode?fov:0,asp,dim);
-   //  Tell GLUT it is necessary to redisplay the scene
-   glutPostRedisplay();
 }
 
-/*
- *  GLUT calls this routine when a key is pressed
- */
 void key(unsigned char ch,int x,int y)
 {
    //  Exit on ESC
    if (ch == 27)
       exit(0);
-   //  Reset view angle
-   else if (ch == '0')
-      th = ph = 0;
-   //  Switch mode
-   else if (ch == 'm' || ch == 'M')
-      mode = 1-mode;
-   else if (ch=='[')
-      viewy -= 0.1;
-   else if (ch==']')
-      viewy += 0.1;
-   //  Ambient level
    else if (ch==' ') {
       charpos[0] = 0;
       charpos[1] = 1.7;
@@ -272,27 +243,13 @@ void key(unsigned char ch,int x,int y)
       diffuse    = 100;
       specular   = 0;
       acc        = 0;
+      th         = 0;
+      int k;
+      for(k=0; k < terrainsize; k++)
+         terrain[k].prop[0] = 1;
    }
-   //  Change field of view angle
-   else if (ch == '-' && ch>1)
-      fov--;
-   else if (ch == '+' && ch<179)
-      fov++;
-   else if (ch == '<' || ch == ',')
-      zh += 1;
-   else if (ch == '>' || ch == '.')
-      zh -= 1;
-   //  Reproject
-   Project(mode?fov:0,asp,dim);
-   glutIdleFunc(move?idle:NULL);
-   //  Tell GLUT it is necessary to redisplay the scene
-   glutPostRedisplay();
 }
 
-/*
- *  GLUT calls this routine when the window is resized
- *  Taken directly from ex13.
- */
 void reshape(int width,int height)
 {
     w = width;
@@ -326,7 +283,7 @@ int main(int argc,char* argv[])
    
    glutIdleFunc(idle);
    LoadTexBMP("test.bmp");
-   testtex = LoadTexBMP("glass.bmp");
+   testtex = LoadTexBMP("rockTexture.bmp");
    //  Pass control to GLUT so it can interact with the user
    ErrCheck("init");
    
