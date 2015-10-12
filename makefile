@@ -1,4 +1,4 @@
-# hackcu
+# Example 23
 EXE=hackcu
 
 # Main target
@@ -8,7 +8,7 @@ all: $(EXE)
 ifeq "$(OS)" "Windows_NT"
 CFLG=-O3 -Wall
 LIBS=-lglut32cu -lglu32 -lopengl32
-CLEAN=rm -f *.exe *.o *.a
+CLEAN=rm *.exe *.o *.a
 else
 #  OSX
 ifeq "$(shell uname)" "Darwin"
@@ -23,6 +23,19 @@ endif
 CLEAN=rm -f $(EXE) *.o *.a
 endif
 
+# Dependencies
+hackcu.o: hackcu.c CSCIx229.h
+fatal.o: fatal.c CSCIx229.h
+loadtexbmp.o: loadtexbmp.c CSCIx229.h
+print.o: print.c CSCIx229.h
+project.o: project.c CSCIx229.h
+errcheck.o: errcheck.c CSCIx229.h
+object.o: object.c CSCIx229.h
+
+#  Create archive
+CSCIx229.a:fatal.o loadtexbmp.o print.o project.o errcheck.o object.o
+	ar -rcs $@ $^
+
 # Compile rules
 .c.o:
 	gcc -c $(CFLG) $<
@@ -30,7 +43,7 @@ endif
 	g++ -c $(CFLG) $<
 
 #  Link
-hackcu:hackcu.o
+hackcu:hackcu.o CSCIx229.a
 	gcc -O3 -o $@ $^   $(LIBS)
 
 #  Clean

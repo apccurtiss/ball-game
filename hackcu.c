@@ -1,9 +1,9 @@
 /*
  *  Alexander Curtiss is awesome
  */
- 
-#include "objects.h"
-#define GL_GLEXT_PROTOTYPES
+#include "CSCIx229.h"
+#include "terrain.h"
+
 
 
 int axes=1;       //  Display axes
@@ -15,35 +15,46 @@ int fov=55;       //  Field of view (for perspective)
 int light=1;      //  Lighting
 double asp=1;     //  Aspect ratio
 double dim=3.0;   //  Size of world
+int w = 600;
+int h = 600;
 
 // Light values
 int up = 0, down = 0, left = 0, right = 0;
 int one       =   1;  // Unit value
-int inc       =  10;  // Ball increment
 int emission  =   0;  // Emission intensity (%)
 int ambient   =  30;  // Ambient intensity (%)
 int diffuse   = 100;  // Diffuse intensity (%)
 int specular  =   0;  // Specular intensity (%)
 int zh        =  90;  // Light azimuth
-float ylight  =   .6;  // Elevation of light
-float terrain[][5] = {{1,4,2,2,1},{0,0,0,0,.5},{1,0,0,0,.5},{1,0,1,0,.5},{1,1,1,0,.5},{2,4,4,0,.5},{1,2,3,0,.5},{0,4,0,0,.5},{3,7,1,0,.5}};
+float viewy  =   .6;  // Elevation of light
+float terrain[][5] = {{1,4,2,2,1},{0,0,0,0,.5},{2,0,0,0,.5},{2,0,2,0,.5},{2,1,2,0,.5},{2,4,4,0,.5},{1,2,3,0,.5},{0,4,0,0,.5},{3,7,1,0,.5}};
+unsigned int testtex;
 int terrainsize = sizeof(terrain) / sizeof(*terrain);
 float charsize = 0.2;
-float charpos[]={0,1.7,0,0.2};
+float charpos[]={0,2,0,0.2};
 float acc    = 0;
 float tick  = 0;
 
 
-#define Cos(th) cos(3.1415927/180*(th))
-#define Sin(th) sin(3.1415927/180*(th))
+void ReadTerrainFile() {
+    FILE *ifp, *ofp;
+char *mode = "r";
+char outputFilename[] = "out.list";
 
-/*
- * ErrCheck, Print, and Project functions taken from previous assignments, and reused verbatum
- */
-void ErrCheck(const char* where)
-{
-   int err = glGetError();
-   if (err) fprintf(stderr,"ERROR: %s [%s]\n",gluErrorString(err),where);
+ifp = fopen("in.list", mode);
+
+if (ifp == NULL) {
+  fprintf(stderr, "Can't open input file in.list!\n");
+  exit(1);
+}
+
+ofp = fopen(outputFilename, "w");
+
+if (ofp == NULL) {
+  fprintf(stderr, "Can't open output file %s!\n",
+          outputFilename);
+  exit(1);
+}
 }
 
 void Print(const char* format , ...)
@@ -78,81 +89,42 @@ void Project(double fov,double asp,double dim)
    glLoadIdentity();
 }
 
-/*
- *  Draw vertex in polar coordinates with normal
- *  Code for Vertex and ball functions shamelessly stolen from ex13.c
- */
-static void Vertex(double th,double ph)
-{
-   double x = Sin(th)*Cos(ph);
-   double y = Cos(th)*Cos(ph);
-   double z =         Sin(ph);
-   //  For a sphere at the origin, the position
-   //  and normal vectors are the same
-   glNormal3d(-x,-y,-z);
-   glVertex3d(x,y,z);
-}
-
-/*
- *  Draw a ball
- *     at (x,y,z)
- *     radius (r)
- */
-static void player(double x,double y,double z,double r)
-{
-   int th,ph;
-
-   //  Save transformation
-   glPushMatrix();
-   //  Offset, scale and rotate
-   glTranslated(x,y,z);
-   glScaled(r,r,r);
-   //  White ball
-   glColor3f(1,1,1);
-   //  Bands of latitude
-   for (ph=-90;ph<90;ph+=inc)
-   {
-      glBegin(GL_QUAD_STRIP);
-      for (th=0;th<=360;th+=2*inc)
-      {
-         Vertex(th,ph);
-         Vertex(th,ph+inc);
-      }
-      glEnd();
-   }
-   //  Undo transofrmations
-   glPopMatrix();
-}
-
 void display()
 {
    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
    glEnable(GL_DEPTH_TEST);
    glLoadIdentity();
-   
-   gluLookAt(charpos[0] - Cos(th) * 2,charpos[1] + ylight * 1.5,charpos[2] - Sin(th) * 2, charpos[0],charpos[1],charpos[2], 0,Cos(ph),0);
+   viewy = 0.6 + charpos[1] * 0.5;
+   gluLookAt(charpos[0] - Cos(th) * 2,charpos[1] + viewy * 1.5,charpos[2] - Sin(th) * 2, charpos[0],charpos[1],charpos[2], 0,Cos(ph),0);
    
    glShadeModel(GL_SMOOTH);
 
    //  Translate intensity to color vectors
+   if(charpos[1] < 0) {
+       ambient = ambient + charpos[1];
+       diffuse = diffuse + charpos[1];
+       specular = specular + charpos[1];
+   }
    float Ambient[]   = {0.01*ambient ,0.01*ambient ,0.01*ambient ,1.0};
    float Diffuse[]   = {0.01*diffuse ,0.01*diffuse ,0.01*diffuse ,1.0};
    float Specular[]  = {0.01*specular,0.01*specular,0.01*specular,1.0};
+   float white[]     = {1,1,1,1};
    float Position[]  = {charpos[0],charpos[1],charpos[2],1.0};
    glColor3f(1,1,1);
    glEnable(GL_LIGHT0);
    
    glEnable(GL_NORMALIZE);
    glEnable(GL_LIGHTING);
-   glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER,0);
+   //glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER,0);
    glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
    glEnable(GL_COLOR_MATERIAL);
    glLightfv(GL_LIGHT0,GL_AMBIENT ,Ambient);
    glLightfv(GL_LIGHT0,GL_DIFFUSE ,Diffuse);
    glLightfv(GL_LIGHT0,GL_SPECULAR,Specular);
    glLightfv(GL_LIGHT0,GL_POSITION,Position);
+   glMaterialf(GL_FRONT_AND_BACK,GL_SHININESS,32);
+   glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR,white);
    
-   player(charpos[0], charpos[1], charpos[2], charsize);
    int k;
    for(k=0; k < terrainsize; k++) {
        if(terrain[k][3] == 0) {
@@ -162,15 +134,17 @@ void display()
        }
        
    }
+   player(charpos[0], charpos[1], charpos[2], charsize, testtex);
    glDisable(GL_LIGHT0);
    //  Display parameters
-   glWindowPos2i(5,5);
-   Print("Angle=%d,%d  Dim=%.1f FOV=%d Projection=%s",
-     th,ph,dim,fov,mode?"Perpective":"Orthogonal");
-   if (light)
-   {
-      glWindowPos2i(5,25);
-      Print("Ambient=%d  Diffuse=%d Specular=%d Emission=%d Elevation=%.1f",ambient,diffuse,specular,emission, ylight);
+   
+   if (charpos[1] < -5)
+   {  
+      glColor3f(1 , 1 , 1);
+      glWindowPos2i((w/2)-100, h/2);
+      Print("Press spacebar to restart!");
+      glWindowPos2i((w/2)-50, (h/2)+20);
+      Print("Game over!");
    }
 
    //  Render the scene and make it visible
@@ -185,7 +159,6 @@ void display()
  */
 void idle()
 {
-    int k;
     double t = glutGet(GLUT_ELAPSED_TIME)/1000.0;
     if(t > tick + 0.01) {
         tick = t;
@@ -204,18 +177,19 @@ void idle()
            charpos[2] -= Sin(th)*step;
         }
       
+        int k;
         for(k=0; k < terrainsize; k++) {
             if(
             terrain[k][3] < 2
             && fabs(charpos[0] - terrain[k][0]) <= terrain[k][4]
             && fabs(charpos[2] - terrain[k][2]) <= terrain[k][4]
-            && charpos[1] - charsize > terrain[k][1] + terrain[k][4]
-            && charpos[1] - charsize + acc < terrain[k][1] + terrain[k][4])
+            && charpos[1] - charsize >= terrain[k][1] + terrain[k][4]
+            && charpos[1] - charsize + acc <= terrain[k][1] + terrain[k][4])
             {
                 acc = -acc;
                 acc = acc + 0.001;
-                terrain[k][4] = terrain[k][4] * 0.9;
                 charpos[1] = charsize + terrain[k][1] + terrain[k][4] + 0.01;
+                terrain[k][4] = terrain[k][4] * 0.9;
                
                 break;
             }
@@ -286,23 +260,24 @@ void key(unsigned char ch,int x,int y)
    else if (ch == 'm' || ch == 'M')
       mode = 1-mode;
    else if (ch=='[')
-      ylight -= 0.1;
+      viewy -= 0.1;
    else if (ch==']')
-      ylight += 0.1;
+      viewy += 0.1;
    //  Ambient level
    else if (ch==' ') {
       charpos[0] = 0;
       charpos[1] = 1.7;
       charpos[2] = 0;
+      ambient    = 30;
+      diffuse    = 100;
+      specular   = 0;
+      acc        = 0;
    }
    //  Change field of view angle
    else if (ch == '-' && ch>1)
       fov--;
    else if (ch == '+' && ch<179)
       fov++;
-   else if (ch == ' ')
-      move = 1 - move;
-   //  Move light
    else if (ch == '<' || ch == ',')
       zh += 1;
    else if (ch == '>' || ch == '.')
@@ -320,6 +295,8 @@ void key(unsigned char ch,int x,int y)
  */
 void reshape(int width,int height)
 {
+    w = width;
+    h = height;
    //  Ratio of the width to the height of the window
    asp = (height>0) ? (double)width/height : 1;
    //  Set the viewport to the entire window
@@ -336,9 +313,9 @@ int main(int argc,char* argv[])
    //  Initialize GLUT
    glutInit(&argc,argv);
    //  Request double buffered, true color window with Z buffering at 600x600
-   glutInitDisplayMode(GLUT_RGB | GLUT_DEPTH | GLUT_DOUBLE);
+   glutInitDisplayMode(GLUT_RGBA | GLUT_DEPTH | GLUT_DOUBLE | GLUT_ALPHA);
    glEnable(GL_CULL_FACE);
-   glutInitWindowSize(600,600);
+   glutInitWindowSize(w,h);
    glutCreateWindow("Alexander Curtiss");
    //  Set callbacks
    glutDisplayFunc(display);
@@ -348,6 +325,8 @@ int main(int argc,char* argv[])
    glutKeyboardFunc(key);
    
    glutIdleFunc(idle);
+   LoadTexBMP("test.bmp");
+   testtex = LoadTexBMP("glass.bmp");
    //  Pass control to GLUT so it can interact with the user
    ErrCheck("init");
    
