@@ -43,16 +43,16 @@ typedef struct
 
 block terrain[] = {
 //  Type, Dimensions, Properties
-   {'b', {-1,0,0,0.5}, {1,0,0}},
-   {'b', {0,0,0,0.5}, {1,0,0}},
-   {'b', {1,0,0,0.5}, {1,0,0}},
-   {'b', {1,0,1,0.5}, {1,0,0}},
-   {'b', {2,1,0,1}, {1,0,0}},
-   {'b', {1,2,0,0.5}, {1,0,0}},
-   {'b', {1,0,-1,0.5}, {1,0,0}},
-   {'b', {2,0,0,0.5}, {1,0,0}},
-   {'b', {2,0.5,1,0.5}, {1,0,0}},
-   {'b', {3,0,3,1}, {1,0,0}}
+   {'b', {0,0,0,0.5}, {0,0,0}},
+   {'b', {1,0,0,0.5}, {0,0,0}},
+   {'b', {1,0,1,0.5}, {0,0,0}},
+   {'b', {2,1,0,1}, {0,0,0}},
+   {'b', {1,2,0,0.5}, {0,0,0}},
+   {'b', {1,0,-1,0.5}, {0,0,0}},
+   {'b', {2,0,0,0.5}, {0,0,0}},
+   {'b', {2,0.5,1,0.5}, {0,0,0}},
+   {'b', {3,0,3,1}, {0,0,0}},
+   {'h', {0,1,0,1}, {1,0,0}}
 };
 int terrainsize = sizeof(terrain) / sizeof(*terrain);
 
@@ -131,7 +131,7 @@ void display()
    int k;
    win = 1;
    for(k=0; k < terrainsize; k++) {
-       if(terrain[k].type == 'b' && (terrain[k].pos[3] / terrain[k].prop[0]) > 0.1) {
+       if(terrain[k].type == 'b' && (terrain[k].pos[3] - terrain[k].prop[0]) > 0.1) {
            win = 0;
            blok(terrain[k].pos, terrain[k].prop);
        } else if(terrain[k].type == 'h') {
@@ -177,22 +177,29 @@ void idle()
       int k;
       if (up || down) {
          for(k=0; k < terrainsize; k++) {
-            float bdim=terrain[k].pos[3] / terrain[k].prop[0];
+            float bdim=terrain[k].pos[3] - terrain[k].prop[0];
             
             if(terrain[k].type == 'b'
-            && terrain[k].prop[0] < 4
-            && fabs(terrain[k].pos[1] - charpos[1] - charsize) < bdim)
+            && bdim > 0.1
+            && fabs(terrain[k].pos[1] - charpos[1]) < bdim + charsize)
             {
-               if(fabs(terrain[k].pos[0] - charpos[0]) > bdim
-               && fabs(terrain[k].pos[0] - charpos[0] - Cos(th)*step - charsize) < bdim)
+               if(fabs(terrain[k].pos[0] - charpos[0]) > bdim + charsize
+               && fabs(terrain[k].pos[0] - charpos[0] - Cos(th)*step) < bdim + charsize
+               && fabs(terrain[k].pos[2] - charpos[2]) <= bdim + charsize) {
                   obstructedx = 1;
-               if(fabs(terrain[k].pos[2] - charpos[2]) > bdim
-               && fabs(terrain[k].pos[2] - charpos[2] - Sin(th)*step - charsize) < bdim)
+               }
+               if(fabs(terrain[k].pos[2] - charpos[2]) > bdim + charsize
+               && fabs(terrain[k].pos[2] - charpos[2] - Sin(th)*step) < bdim + charsize
+               && fabs(terrain[k].pos[0] - charpos[0]) <= bdim + charsize) {
                   obstructedz = 1;
+               }
+                  
             }
          }
       }
-   
+      
+      
+      
       if (right) {
          if(mode) {
             th += 1;
@@ -231,7 +238,7 @@ void idle()
    
       for(k=0; k < terrainsize; k++) {
          if(terrain[k].type == 'b') {
-            float bdim=terrain[k].pos[3] / terrain[k].prop[0];
+            float bdim=terrain[k].pos[3] - terrain[k].prop[0];
             if(bdim > 0.1
             && fabs(charpos[0] - terrain[k].pos[0]) <= bdim + charsize
             && fabs(charpos[2] - terrain[k].pos[2]) <= bdim + charsize)
@@ -243,7 +250,7 @@ void idle()
                    
                    //terrain[k][1] = terrain[k][1] - 0.2;
                    if(mode)
-                     terrain[k].prop[0] = terrain[k].prop[0] * 1.5;
+                     terrain[k].prop[0] = terrain[k].prop[0] + 0.15;
                    charpos[1] = terrain[k].pos[1] + bdim + charsize + 0.01;
                    collidepos[0] = charpos[0];
                    collidepos[1] = terrain[k].pos[1] + bdim;
@@ -307,7 +314,7 @@ void key(unsigned char ch,int x,int y)
       th         = 0;
       int k;
       for(k=0; k < terrainsize; k++)
-         terrain[k].prop[0] = 1;
+         terrain[k].prop[0] = 0;
    }
    else if (ch=='m') {
       mode = 1-mode;
