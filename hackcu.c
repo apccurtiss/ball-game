@@ -35,8 +35,8 @@ float charpos[]={0,2,0,0.2};
 float collidepos[]={0,0,0};
 int collidetick = 1000;
 float explodepos[]={0,0,0};
-int explodetick = 1000;
-float deform = 1000;
+int explodetick = 100;
+float deform = 100;
 int deformtick = 0;
 float acc    = 0;
 float tick  = 0;
@@ -147,8 +147,6 @@ void display()
        }
    }
     // << default texture object
-   int size = (min(w,h) / 20) - collidetick - (!mode * 35);
-   size = size > 1?size:1;
    player(charpos[0], charpos[1], charpos[2], charsize, th, deform, balltex);
    glDisable(GL_LIGHTING);
    glDisable(GL_NORMALIZE);
@@ -166,10 +164,12 @@ void display()
       
    }
    
+   int size = (min(w,h) / 20) - collidetick - (!mode * 35);
+   size = size > 1?size:1;
    if(collidetick < 100)
       debris(collidepos, collidetick, size);
-   if(explodetick < 100)
-      explosion(explodepos, explodetick, size);
+   if(explodetick < 45)
+      explosion(explodepos, explodetick * 2);
 
    ErrCheck("display");
    glFlush();
@@ -262,20 +262,20 @@ void idle()
                if(charpos[1] - charsize >= terrain[k].pos[1] + bdim
                && charpos[1] - charsize + acc <= terrain[k].pos[1] + bdim)
                {
-                   acc = (terrain[k].type == 'b'?0.05:0.1);
+                   acc = (terrain[k].type == 'b'?0.05:0.13);
                    if(mode)
                      terrain[k].prop[0] = terrain[k].prop[0] + 0.15;
                    charpos[1] = terrain[k].pos[1] + bdim + charsize + 0.01;
-                   if(terrain[k].type = 'b'){
+                   if(terrain[k].type == 'b'){
                       collidepos[0] = charpos[0];
                       collidepos[1] = terrain[k].pos[1] + bdim;
                       collidepos[2] = charpos[2];
                       collidetick = 0;
                    }
-                   if(terrain[k].type = 'k'){
-                      explodepos[0] = charpos[0];
-                      explodepos[1] = terrain[k].pos[1] + bdim;
-                      explodepos[2] = charpos[2];
+                   if(terrain[k].type == 't'){
+                      explodepos[0] = terrain[k].pos[0];
+                      explodepos[1] = terrain[k].pos[1];
+                      explodepos[2] = terrain[k].pos[2];
                       explodetick = 0;
                    }
                    deformtick = 0;
