@@ -6,6 +6,7 @@
 
 
 int win=0;
+int wintick=0;
 int axes=1;       //  Display axes
 int mode=1;       //  Projection mode
 int move=1;       //  Move light
@@ -20,16 +21,16 @@ int h = 600;
 
 // Light values
 int up = 0, down = 0, left = 0, right = 0;
-int one       =   1;  // Unit value
-int emission  =   0;  // Emission intensity (%)
-int ambient   =  30;  // Ambient intensity (%)
-int diffuse   = 100;  // Diffuse intensity (%)
-int specular  =   0;  // Specular intensity (%)
-float viewy  =   .6;  // Elevation of light
+int one      =   1;  // Unit value
+int emission =   0;  // Emission intensity (%)
+int ambient  =  30;  // Ambient intensity (%)
+int diffuse  = 100;  // Diffuse intensity (%)
+int specular =   0;  // Specular intensity (%)
+float viewy  =  .6;  // Elevation of light
 unsigned int rocktex;
 unsigned int tnttex;
 unsigned int balltex;
-unsigned int hooptex;
+unsigned int startex;
 float charsize = 0.2;
 float charpos[]={0,2,0,0.2};
 float collidepos[]={0,0,0};
@@ -50,17 +51,21 @@ typedef struct
 
 block terrain[] = {
 //  Type, Dimensions, Properties
+   {'s', {3,5,-3,0.5}, {0,0,0}},
    {'b', {0,0,0,0.5}, {0,0,0}},
    {'b', {1,0,0,0.5}, {0,0,0}},
    {'b', {1,0,1,0.5}, {0,0,0}},
-   {'b', {2,1,0,1}, {0,0,0}},
-   {'b', {1,2,0,0.5}, {0,0,0}},
    {'b', {1,0,-1,0.5}, {0,0,0}},
    {'b', {2,0,0,0.5}, {0,0,0}},
-   {'b', {2,0.5,1,0.5}, {0,0,0}},
-   {'b', {3,0,3,1}, {0,0,0}},
-   {'t', {0,0,1,0.5}, {0,0,0}},
-   {'t', {4,1,4,1}, {0,0,0}},
+   {'b', {2,1,0,0.5}, {0,0,0}},
+   {'b', {1,1,-2,0.5}, {0,0,0}},
+   {'b', {2,2,-3,0.5}, {0,0,0}},
+   {'b', {4,2.5,-3,0.5}, {0,0,0}},
+   {'b', {4,2.5,-4,0.5}, {0,0,0}},
+   {'t', {4,3.5,-4,0.5}, {0,0,0}},
+   {'t', {6,4,-6,0.5}, {0,0,0}},
+   {'t', {0,2,0,0.5}, {0,0,0}},
+   //{'t', {4,1,4,1}, {0,0,0}},
 };
 int terrainsize = sizeof(terrain) / sizeof(*terrain);
 
@@ -102,9 +107,10 @@ void display()
    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
    glEnable(GL_DEPTH_TEST);
    glLoadIdentity();
+   
    viewy = 0.6 + charpos[1] * 0.5;
    if(mode)
-      gluLookAt(charpos[0] - Cos(th) * 2,charpos[1] + viewy * 1.5,charpos[2] - Sin(th) * 2, charpos[0],charpos[1],charpos[2], 0,Cos(ph),0);
+      gluLookAt(charpos[0] - Cos(th) * 2,charpos[1] + viewy * 1.5,charpos[2] - Sin(th) * 2, charpos[0],charpos[1],charpos[2], 0,1,0);
    else
       gluLookAt(-Sin(th) * Cos(ph) * 5,-Sin(ph) * 5,-Cos(th) * Cos(ph) * 5, 0,0,0, 0,Cos(ph),0);
    
@@ -115,16 +121,22 @@ void display()
        diffuse = diffuse + charpos[1];
        specular = specular + charpos[1];
    }
-   float Ambient[]   = {0.01*ambient ,0.01*ambient ,0.01*ambient ,1.0};
-   float Diffuse[]   = {0.01*diffuse ,0.01*diffuse ,0.01*diffuse ,1.0};
-   float Specular[]  = {0.01*specular,0.01*specular,0.01*specular,1.0};
-   float white[]     = {1,1,1,1};
-   float Position[]  = {charpos[0],charpos[1],charpos[2],1.0};
+   ambient = ambient - (wintick / 100.);
+   diffuse = diffuse - (wintick / 100.);
+   specular = specular - (wintick / 100.);
+   ambient = ambient > 0?ambient:0;
+   diffuse = diffuse > 0?diffuse:0;
+   specular = specular > 0?specular:0;
+   
+   float Ambient[]  = {0.01*ambient ,0.01*ambient ,0.01*ambient ,1.0};
+   float Diffuse[]  = {0.01*diffuse ,0.01*diffuse ,0.01*diffuse ,1.0};
+   float Specular[] = {0.01*specular,0.01*specular,0.01*specular,1.0};
+   float Position[] = {charpos[0],charpos[1],charpos[2],1.0};
+   float white[]    = {1,1,1,1};
    glColor3f(1,1,1);
    glEnable(GL_LIGHT0);
    glEnable(GL_NORMALIZE);
    glEnable(GL_LIGHTING);
-   //glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER,0);
    glColorMaterial(GL_FRONT_AND_BACK,GL_AMBIENT_AND_DIFFUSE);
    glEnable(GL_COLOR_MATERIAL);
    glLightfv(GL_LIGHT0,GL_AMBIENT ,Ambient);
@@ -135,15 +147,14 @@ void display()
    glMaterialfv(GL_FRONT_AND_BACK,GL_SPECULAR,white);
    
    int k;
-   win = 1;
+   //win = 1;
    for(k=0; k < terrainsize; k++) {
        if(terrain[k].type == 'b' && (terrain[k].pos[3] - terrain[k].prop[0]) > 0.1) {
-           win = 0;
            blok(terrain[k].pos, terrain[k].prop,rocktex);
-       } else if(terrain[k].type == 't') {
-           win = 0;
-           if(!terrain[k].prop[0])
-              blok(terrain[k].pos, terrain[k].prop,tnttex);
+       } else if(terrain[k].type == 't' && !terrain[k].prop[0]) {
+            blok(terrain[k].pos, terrain[k].prop,tnttex);
+       } else if(terrain[k].type == 's' && !terrain[k].prop[0]) {
+            blok(terrain[k].pos, terrain[k].prop,startex);
        }
    }
     // << default texture object
@@ -154,7 +165,7 @@ void display()
    //  Display parameters
    
    glBindTexture(GL_TEXTURE_2D, 0);
-   if (charpos[1] < -5)
+   if (charpos[1] < -5 || wintick > 100)
    {  
       glColor3f(1,1,1);
       glWindowPos2i((w/2)-50, (h/2)+20);
@@ -169,8 +180,9 @@ void display()
    if(collidetick < 100)
       debris(collidepos, collidetick, size);
    if(explodetick < 45)
-      explosion(explodepos, explodetick * 2);
-
+      explosion(explodepos, explodetick * 2, 0);
+   if(wintick > 0 && wintick < 180)
+      explosion(terrain[0].pos, wintick / 2, 1);
    ErrCheck("display");
    glFlush();
    glutSwapBuffers();
@@ -184,10 +196,15 @@ void idle()
       tick = t;
       collidetick++;
       explodetick++;
+      if(win)
+         wintick++;
       if (deformtick <= 100) {
          deformtick++;
          deformtick %= 360;
-         deform = Cos(deformtick * 10.8) * (100 - deformtick) / 200;
+         if(win)
+            deform = Cos(deformtick * 10.8) * (100 - deformtick) / 2000;
+         else
+            deform = Cos(deformtick * 10.8) * (100 - deformtick) / 600;
       }
        
       float step = 0.025;
@@ -203,33 +220,30 @@ void idle()
             {
                if(fabs(terrain[k].pos[0] - charpos[0]) > bdim + charsize
                && fabs(terrain[k].pos[0] - charpos[0] - Cos(th)*step) < bdim + charsize
-               && fabs(terrain[k].pos[2] - charpos[2]) <= bdim + charsize) {
+               && fabs(terrain[k].pos[2] - charpos[2]) <= bdim + charsize)
                   obstructedx = 1;
-               }
                if(fabs(terrain[k].pos[2] - charpos[2]) > bdim + charsize
                && fabs(terrain[k].pos[2] - charpos[2] - Sin(th)*step) < bdim + charsize
-               && fabs(terrain[k].pos[0] - charpos[0]) <= bdim + charsize) {
+               && fabs(terrain[k].pos[0] - charpos[0]) <= bdim + charsize)
                   obstructedz = 1;
-               }
-                  
             }
          }
       }
       
       if (right) {
-         if(mode) {
+         if(mode && !win) {
             th += 2;
          } else {
             th += 2;
          }
       } if (left) {
-         if(mode) {
+         if(mode && !win) {
             th -= 2;
          } else {
             th -= 2;
          }
       } if (up) {
-         if(mode) {
+         if(mode && !win) {
             if(!obstructedx)
                charpos[0] += Cos(th)*step;
             if(!obstructedz)
@@ -239,7 +253,7 @@ void idle()
          }
       }
       if (down) {
-         if(mode) {
+         if(mode && !win) {
             if(!obstructedx)
                charpos[0] -= Cos(th)*step;
             if(!obstructedz)
@@ -255,29 +269,33 @@ void idle()
       for(k=0; k < terrainsize; k++) {
          float bdim=terrain[k].pos[3] - terrain[k].prop[0];
          if((terrain[k].type == 'b' && bdim > 0.1)
-         || (terrain[k].type == 't' && !terrain[k].prop[0])) {
+         || (terrain[k].type == 't' && !terrain[k].prop[0])
+         || (terrain[k].type == 's' && !terrain[k].prop[0])) {
             if(fabs(charpos[0] - terrain[k].pos[0]) <= bdim + charsize
             && fabs(charpos[2] - terrain[k].pos[2]) <= bdim + charsize)
             {
                if(charpos[1] - charsize >= terrain[k].pos[1] + bdim
                && charpos[1] - charsize + acc <= terrain[k].pos[1] + bdim)
                {
-                   acc = (terrain[k].type == 'b'?0.05:0.13);
                    if(mode)
-                     terrain[k].prop[0] = terrain[k].prop[0] + 0.15;
+                   terrain[k].prop[0] = terrain[k].prop[0] + 0.15;
                    charpos[1] = terrain[k].pos[1] + bdim + charsize + 0.01;
                    if(terrain[k].type == 'b'){
                       collidepos[0] = charpos[0];
                       collidepos[1] = terrain[k].pos[1] + bdim;
                       collidepos[2] = charpos[2];
                       collidetick = 0;
+                      acc = 0.05;
                    }
                    if(terrain[k].type == 't'){
                       explodepos[0] = terrain[k].pos[0];
                       explodepos[1] = terrain[k].pos[1];
                       explodepos[2] = terrain[k].pos[2];
                       explodetick = 0;
+                      acc = 0.13;
                    }
+                   if(terrain[k].type == 's')
+                      win=1;
                    deformtick = 0;
                    break;
                }
@@ -291,7 +309,8 @@ void idle()
          }
       }
       acc -= 0.001;
-      charpos[1] += acc;
+      charpos[1] += acc / (1 + wintick);
+      
    }
    glutPostRedisplay();
 }
@@ -335,6 +354,8 @@ void key(unsigned char ch,int x,int y)
       specular   = 0;
       acc        = 0;
       th         = 0;
+      win = 0;
+      wintick = 0;
       int k;
       for(k=0; k < terrainsize; k++)
          terrain[k].prop[0] = 0;
@@ -350,18 +371,12 @@ void reshape(int width,int height)
 {
    w = width;
    h = height;
-   //  Ratio of the width to the height of the window
    asp = (height>0) ? (double)width/height : 1;
-   //  Set the viewport to the entire window
    glViewport(0,0, width,height);
-   //  Set projection
-   Project(mode?fov:0,asp,dim);
+   Project(fov,asp,dim);
    glutPostRedisplay();
 }
 
-/*
- *  Start up GLUT and tell it what to do
- */
 int main(int argc,char* argv[])
 {
    //  Initialize GLUT
@@ -381,8 +396,9 @@ int main(int argc,char* argv[])
    glutIdleFunc(idle);
    LoadTexBMP("test.bmp");
    rocktex = LoadTexBMP("rockTexture.bmp");
-   balltex = LoadTexBMP("glass.bmp");
+   balltex = LoadTexBMP("ballTexture.bmp");
    tnttex = LoadTexBMP("tntTexture.bmp");
+   startex = LoadTexBMP("starTexture.bmp");
    //  Pass control to GLUT so it can interact with the user
    ErrCheck("init");
    
