@@ -26,11 +26,18 @@ int ambient   =  30;  // Ambient intensity (%)
 int diffuse   = 100;  // Diffuse intensity (%)
 int specular  =   0;  // Specular intensity (%)
 float viewy  =   .6;  // Elevation of light
-unsigned int testtex;
+unsigned int rocktex;
+unsigned int tnttex;
+unsigned int balltex;
+unsigned int hooptex;
 float charsize = 0.2;
 float charpos[]={0,2,0,0.2};
 float collidepos[]={0,0,0};
 int collidetick = 1000;
+float explodepos[]={0,0,0};
+int explodetick = 1000;
+float deform = 1000;
+int deformtick = 0;
 float acc    = 0;
 float tick  = 0;
 
@@ -52,7 +59,8 @@ block terrain[] = {
    {'b', {2,0,0,0.5}, {0,0,0}},
    {'b', {2,0.5,1,0.5}, {0,0,0}},
    {'b', {3,0,3,1}, {0,0,0}},
-   {'h', {0,1,0,1}, {1,0,0}}
+   {'t', {0,0,1,0.5}, {0,0,0}},
+   {'t', {4,1,4,1}, {0,0,0}},
 };
 int terrainsize = sizeof(terrain) / sizeof(*terrain);
 
@@ -98,12 +106,10 @@ void display()
    if(mode)
       gluLookAt(charpos[0] - Cos(th) * 2,charpos[1] + viewy * 1.5,charpos[2] - Sin(th) * 2, charpos[0],charpos[1],charpos[2], 0,Cos(ph),0);
    else
-      gluLookAt(-Sin(th) * Cos(ph) * 10,-Sin(ph) * 10,-Cos(th) * Cos(ph) * 10, 0,0,0, 0,Cos(ph),0);
-   //gluLookAt(Cos(th) * 10,,Sin(th) * 10, 0,0,0, 0,Cos(ph),0);
+      gluLookAt(-Sin(th) * Cos(ph) * 5,-Sin(ph) * 5,-Cos(th) * Cos(ph) * 5, 0,0,0, 0,Cos(ph),0);
    
    glShadeModel(GL_SMOOTH);
 
-   //  Translate intensity to color vectors
    if(charpos[1] < 0) {
        ambient = ambient + charpos[1];
        diffuse = diffuse + charpos[1];
@@ -133,32 +139,38 @@ void display()
    for(k=0; k < terrainsize; k++) {
        if(terrain[k].type == 'b' && (terrain[k].pos[3] - terrain[k].prop[0]) > 0.1) {
            win = 0;
-           blok(terrain[k].pos, terrain[k].prop);
-       } else if(terrain[k].type == 'h') {
-           hoop(terrain[k].pos, terrain[k].prop);
+           blok(terrain[k].pos, terrain[k].prop,rocktex);
+       } else if(terrain[k].type == 't') {
+           win = 0;
+           if(!terrain[k].prop[0])
+              blok(terrain[k].pos, terrain[k].prop,tnttex);
        }
    }
-   
-   int size = collidetick>=50 - (!mode * 25)?1:50 - collidetick - (!mode * 25);
-   debris(collidepos, collidetick, size);
-      
-   player(charpos[0], charpos[1], charpos[2], charsize, testtex);
+    // << default texture object
+   int size = (min(w,h) / 20) - collidetick - (!mode * 35);
+   size = size > 1?size:1;
+   player(charpos[0], charpos[1], charpos[2], charsize, th, deform, balltex);
    glDisable(GL_LIGHTING);
    glDisable(GL_NORMALIZE);
    glDisable(GL_LIGHT0);
    //  Display parameters
    
+   glBindTexture(GL_TEXTURE_2D, 0);
    if (charpos[1] < -5)
    {  
-      glColor3f(1 , 1 , 1);
+      glColor3f(1,1,1);
       glWindowPos2i((w/2)-50, (h/2)+20);
       Print(win?"You win!":"Game over!");
       glWindowPos2i((w/2)-100, h/2);
       Print("Press spacebar to restart");
       
    }
+   
+   if(collidetick < 100)
+      debris(collidepos, collidetick, size);
+   if(explodetick < 100)
+      explosion(explodepos, explodetick, size);
 
-   //  Render the scene and make it visible
    ErrCheck("display");
    glFlush();
    glutSwapBuffers();
@@ -171,6 +183,12 @@ void idle()
    if(t > tick + .01) {
       tick = t;
       collidetick++;
+      explodetick++;
+      if (deformtick <= 100) {
+         deformtick++;
+         deformtick %= 360;
+         deform = Cos(deformtick * 10.8) * (100 - deformtick) / 200;
+      }
        
       float step = 0.025;
         
@@ -179,8 +197,8 @@ void idle()
          for(k=0; k < terrainsize; k++) {
             float bdim=terrain[k].pos[3] - terrain[k].prop[0];
             
-            if(terrain[k].type == 'b'
-            && bdim > 0.1
+            if(((terrain[k].type == 'b' && bdim > 0.1)
+            || (terrain[k].type == 't' && !terrain[k].prop[0]))
             && fabs(terrain[k].pos[1] - charpos[1]) < bdim + charsize)
             {
                if(fabs(terrain[k].pos[0] - charpos[0]) > bdim + charsize
@@ -198,17 +216,15 @@ void idle()
          }
       }
       
-      
-      
       if (right) {
          if(mode) {
-            th += 1;
+            th += 2;
          } else {
             th += 2;
          }
       } if (left) {
          if(mode) {
-            th -= 1;
+            th -= 2;
          } else {
             th -= 2;
          }
@@ -235,27 +251,34 @@ void idle()
       
       ph %= 360;
       th %= 360;
-   
+      
       for(k=0; k < terrainsize; k++) {
-         if(terrain[k].type == 'b') {
-            float bdim=terrain[k].pos[3] - terrain[k].prop[0];
-            if(bdim > 0.1
-            && fabs(charpos[0] - terrain[k].pos[0]) <= bdim + charsize
+         float bdim=terrain[k].pos[3] - terrain[k].prop[0];
+         if((terrain[k].type == 'b' && bdim > 0.1)
+         || (terrain[k].type == 't' && !terrain[k].prop[0])) {
+            if(fabs(charpos[0] - terrain[k].pos[0]) <= bdim + charsize
             && fabs(charpos[2] - terrain[k].pos[2]) <= bdim + charsize)
             {
                if(charpos[1] - charsize >= terrain[k].pos[1] + bdim
                && charpos[1] - charsize + acc <= terrain[k].pos[1] + bdim)
                {
-                   acc = 0.05;
-                   
-                   //terrain[k][1] = terrain[k][1] - 0.2;
+                   acc = (terrain[k].type == 'b'?0.05:0.1);
                    if(mode)
                      terrain[k].prop[0] = terrain[k].prop[0] + 0.15;
                    charpos[1] = terrain[k].pos[1] + bdim + charsize + 0.01;
-                   collidepos[0] = charpos[0];
-                   collidepos[1] = terrain[k].pos[1] + bdim;
-                   collidepos[2] = charpos[2];
-                   collidetick = 0;
+                   if(terrain[k].type = 'b'){
+                      collidepos[0] = charpos[0];
+                      collidepos[1] = terrain[k].pos[1] + bdim;
+                      collidepos[2] = charpos[2];
+                      collidetick = 0;
+                   }
+                   if(terrain[k].type = 'k'){
+                      explodepos[0] = charpos[0];
+                      explodepos[1] = terrain[k].pos[1] + bdim;
+                      explodepos[2] = charpos[2];
+                      explodetick = 0;
+                   }
+                   deformtick = 0;
                    break;
                }
                if(charpos[1] + charsize >= terrain[k].pos[1] - bdim
@@ -325,14 +348,15 @@ void key(unsigned char ch,int x,int y)
 
 void reshape(int width,int height)
 {
-    w = width;
-    h = height;
+   w = width;
+   h = height;
    //  Ratio of the width to the height of the window
    asp = (height>0) ? (double)width/height : 1;
    //  Set the viewport to the entire window
    glViewport(0,0, width,height);
    //  Set projection
    Project(mode?fov:0,asp,dim);
+   glutPostRedisplay();
 }
 
 /*
@@ -356,7 +380,9 @@ int main(int argc,char* argv[])
    
    glutIdleFunc(idle);
    LoadTexBMP("test.bmp");
-   testtex = LoadTexBMP("rockTexture.bmp");
+   rocktex = LoadTexBMP("rockTexture.bmp");
+   balltex = LoadTexBMP("glass.bmp");
+   tnttex = LoadTexBMP("tntTexture.bmp");
    //  Pass control to GLUT so it can interact with the user
    ErrCheck("init");
    
